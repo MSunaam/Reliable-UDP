@@ -13,7 +13,7 @@ struct addrinfo {
 };
 ```
 
-This struct is used in host name lookups, and service name lookups. This struct is loaded with information and then the `getaddrinfo()` function is called.
+This struct is used in host name lookups, and service name lookups. This struct is loaded with information and then the [`getaddrinfo()`](#getaddrinfo) function is called.
 
 This is a linked list, as `*ai_next` points to the next element.
 
@@ -23,7 +23,7 @@ The pointer `ai_addr` points to the [struct sockaddr](#sockaddr). It holds socke
 ```
 struct sockaddr {
 unsigned short sa_family; // address family, AF_xxx
-char sa_data[14]; // 14 bytes of protocol address
+    char sa_data[14]; // 14 bytes of protocol address
 };
 ```
 This struct holds address information for different types of sockets.1. `sa_family` can be `AF_INET(IPv4)` or `AF_INET6(IPv6)`.
@@ -34,10 +34,10 @@ A parallel [struct `sockaddr_in`](#struct-sockaddr_in) is used for IPv4. Pointer
 ### Struct Sockaddr_In
 ```
 struct sockaddr_in {
-short int sin_family; // Address family, AF_INET
-unsigned short int sin_port; // Port number
-struct in_addr sin_addr; // Internet address
-unsigned char sin_zero[8]; // Same size as struct sockaddr
+    short int sin_family; // Address family, AF_INET
+    unsigned short int sin_port; // Port number
+    struct in_addr sin_addr; // Internet address
+    unsigned char sin_zero[8]; // Same size as struct sockaddr
 };
 ```
 1. `sin_zero` is used to pad this struct with zeros to make its length equal to [Struct Sockaddr](#struct-sockaddr)
@@ -48,6 +48,16 @@ unsigned char sin_zero[8]; // Same size as struct sockaddr
 // (IPv4 only--see struct in6_addr for IPv6)
 // Internet address (a structure for historical reasons)
 struct in_addr {
-uint32_t s_addr; // that's a 32-bit int (4 bytes)
+    uint32_t s_addr; // that's a 32-bit int (4 bytes)
 };
+```
+## Functions Used
+### GetAddrInfo()
+`getaddrinfo()` helps set up the structs you need later on. This function does DNS Lookups and service name lookups and fills all the necessary structs.
+```
+int getaddrinfo(
+    const char *node, // e.g. "www.example.com" or IP
+    const char *service, // e.g. "http" or port number const struct addrinfo *hints,
+    struct addrinfo **res
+    );
 ```
