@@ -175,7 +175,7 @@ void receiveFile(serverPtr server){
     remainingBytes = fileSize;
     bytesReceived = 0;
 
-    while (remainingBytes > 0 || no_of_packets == 5){
+    while (remainingBytes > 0 && no_of_packets == 5){
         // Reset the arrays
         memset(packetArray, 0, sizeof packetArray);
         for (int i = 0; i < no_of_packets; i++){
@@ -193,42 +193,30 @@ void receiveFile(serverPtr server){
         numberAcks = 0;
 
         // Keep running while all packets in one window are not received
-        while(numberAcks < no_of_packets){
-            // Send Acks for received packets
-            for (int i = 0; i < no_of_packets; i++){
-                currentSequenceNumber = packetArray[i].packetSequenceNumber;
-                // If the Ack has not been sent
-                if(ackArray[currentSequenceNumber] != 1){
-
-                    // If the packet has been received
-                    if(packetArray[i].packetSize > 0){
-                        // Set Ack as sent
-                        ackArray[currentSequenceNumber] = 1;
-
-                        // Send Ack
-                        if(sendto(
-                            getListenSocket(server),
-                            &currentSequenceNumber,
-                            sizeof currentSequenceNumber,
-                            0,
-                            (struct sockaddr*)&server->clientAddress,
-                            addrLen
-                            ) < 0){
-                                perror("\033[91mServer Sendto:\033[0m");
-                                exit(EXIT_FAILURE);
-                            }
-                            else {
-                                numberAcks++;
-                                printf("Ack Sent: %d\n", currentSequenceNumber);
-                            }
-                    }
-                    
+        RESEND_ACK:
+        for(int i =0; i < no_of_packets; i++){
+            int currentAck = packetArray[i].packetSequenceNumber;
+            // If ack not already sent
+            if(ackArray[currentAck] != 1){
+                // Send acks of received packets
+                if(packetArray[i].packetSize != 0){
+                    ackArray[currentAck] = 1;
+                    // Send Acks
+                    if(sendto(getListenSocket(server), &currentAck, sizeof(currentAck), 0, (struct sockaddr *)&server->clientAddress, addrLen) > 0) {
+						numberAcks++;
+						printf("Ack sent: %d\n", currentAck);
+					}
                 }
             }
+        }
 
-            // Stop and Wait for acks to be sent and accepted by the client
-            nanosleep(&reqTime, &remTime);
-		    nanosleep(&reqTime, &remTime);
+        // Stop and Wait for acks to be received
+        nanosleep(&reqTime, &remTime);
+        nanosleep(&reqTime, &remTime);
+
+        // If all packets not received
+        if(numberAcks < no_of_packets){
+            goto RESEND_ACK;
         }
 
         // Window Size number of packets have been received
@@ -249,6 +237,7 @@ void receiveFile(serverPtr server){
 
         printf("\033[1mSize Received: %ld bytes\t Size Remaining: %ld bytes\n\033[0m", bytesReceived, remainingBytes);
         // Loop for next 5 packets
+        
     }
     // Received All Packets
     printf("\033[1m\033[92mFile Received and Saved\033[0m\n");
@@ -269,84 +258,37 @@ void* receivePackets(void* params){
     for(int i = 0; i < no_of_packets; i++)
     {
         RECEIVE:
-        if((receivedBytes = recvfrom(
-                getListenSocket(server),
-                &currentPacket,
-                sizeof (currentPacket),
-                0,
-                (struct sockaddr*)&server->clientAddress,
-                &addrLen
-                )) < 0)
-            {
-                perror("\033[91mServer recvfrom:\033[0m");
-                exit(EXIT_FAILURE);
-            }
-
-        while(packetArray[currentPacket.packetSequenceNumber].packetSize != 0)
-        {
-            if((receivedBytes = recvfrom(
-                getListenSocket(server),
-                &currentPacket,
-                sizeof (currentPacket),
-                0,
-                (struct sockaddr*)&(server->clientAddress),
-                &addrLen
-                )) < 0)
-            {
-                perror("\033[91mServer recvfrom:\033[0m");
-                exit(EXIT_FAILURE);
-            }
-            // If packet is duplicate
-            
-            // Relocating the array
+        if((receivedBytes = recvfrom(getListenSocket(server), &currentPacket, sizeof currentPacket, 0, (struct sockaddr*)&server->clientAddress, &addrLen))<0){
+            perror("\033[91mServer recvfrom:\033[0m");
+            exit(EXIT_FAILURE);
+        }
+        // For duplicate packet
+        if(packetArray[currentPacket.packetSequenceNumber].packetSize != 0){
+            // Reset Array
             packetArray[currentPacket.packetSequenceNumber] = currentPacket;
 
-            // Create acks
-            int tempAck = currentPacket.packetSequenceNumber;
-            ackArray[tempAck] = 1;
-            
-            // Send Duplicate Ack
-            if(sendto(
-                getListenSocket(param->server),
-                &tempAck,
-                sizeof tempAck,
-                0,
-                (struct sockaddr*)&(server->clientAddress),
-                addrLen
-            ) < 0)
-            {
-                perror("\033[91mServer sendto:\033[0m\n");
+            int currentAck = currentPacket.packetSequenceNumber;
+            ackArray[currentAck] = 1;
+            // Send Diplicate ACK
+            if(sendto(getListenSocket(server), &currentAck, sizeof currentAck, 0, (struct sockaddr*)&server->clientAddress, addrLen)<0){
+                perror("\033[91mServer sendto:\033[0m");
                 exit(EXIT_FAILURE);
-            } 
-            printf("\033[94mDuplicate Ack Sent:%d\n\033[0m",tempAck);   
+            }
+            printf("\033[94mDuplicate ACK Sent:%d\n", currentAck);
+            goto RECEIVE;
         }
-        // In Case of Unique Packet
-        if(receivedBytes > 0){
-            printf("Packet Number: %d\n", currentPacket.packetSequenceNumber);
-            packetArray[currentPacket.packetSequenceNumber] = currentPacket;
-        }
-        // In Case of last packet
+
+        //For Last Packet
         if(currentPacket.packetSize == -1){
-            printf("\033[92mLast Packet Found\033[0m\n");
+            printf("\033[92mLast Packet Found\n\033[0m");
             no_of_packets = currentPacket.packetSequenceNumber + 1;
-            if(sendto(
-                getListenSocket(server),
-                &currentPacket.packetSequenceNumber,
-                sizeof currentPacket.packetSequenceNumber,
-                0,
-                (struct sockaddr*)&server->clientAddress,
-                addrLen
-                ) < 0)
-                {
-                    perror("\033[91mServer Sendto:\033[0m");
-                    exit(EXIT_FAILURE);
-                }
-            else {
-                numberAcks++;
-                printf("Ack Sent: %d\n", currentSequenceNumber);
-            }
-            break;
-        }
+        } 
+        //For Unique Packet
+        if (receivedBytes > 0) {
+			printf("Packet Received:%d\n", currentPacket.packetSequenceNumber);
+			// Keep the correct order of packets by index of the array
+			packetArray[currentPacket.packetSequenceNumber] = currentPacket;
+		}
     }
     return NULL;
 }
