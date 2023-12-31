@@ -61,3 +61,35 @@ int getaddrinfo(
     struct addrinfo **res
     );
 ```
+This gives a linked list of [`struct addrinfo`](#struct-addrinfo), res, of results.
+
+1. The Node parameter is the hostname or IP Address to connect to.
+2. The Service parameter is a port number or the name of a service like "ftp", "telnet", or "smtp" etc.
+3. The Hint parameter points to a [`struct addrinfo`](#struct-addrinfo) that is already filled out with relevant information.
+
+**freeaddrinfo()** is used to free up the linked list `res`.
+
+### Socket()
+```
+#include <sys/types.h>
+#include <sys/socket.h>
+
+int socket(int domain, int type, int protocol);
+```
+`socket()` simply returns to you a socket descriptor that you can use in later system calls, or -1 on error. The global variable errno is set to the error’s value.
+
+1. Domain is `PF_INET` (IPv4) or `PF_INET6`(IPv6).
+2. Type is `SOCK_STREAM`(TCP) or `SOCK_DGRAM`(UDP).
+3. Protocol can be set by `getprotobyname('tcp)` or `getprotobyname('udp)`.
+
+### Bind()
+```
+#include <sys/types.h>
+#include <sys/socket.h>
+
+int bind(int sockfd, struct sockaddr *my_addr, int addrlen);
+```
+
+1. `sockfd` is the socket descriptor returned by [`socket()`](#socket).
+2. `my_addr` pointer to [`sockaddr` struct](#struct-sockaddr) is used to store IP Address, and port number.
+3. `addrlen` is the length of `myaddr`.
