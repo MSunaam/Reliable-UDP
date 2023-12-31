@@ -16,48 +16,50 @@
 // Green success code => \033[92m
 
 // Function Prototypes
-void serverConstructor(serverPtr serverPtr);
-void serverDestructor(serverPtr serverPtr);
-void setWindowSize(serverPtr serverPtr, int windowSize);
-int getWindowSize(serverPtr serverPtr);
-int getListenSocket(serverPtr serverPtr);
-void recieve(serverPtr serverPtr);
+void serverConstructor(serverPtr server);
+void serverDestructor(serverPtr server);
+void setWindowSize(serverPtr server, int windowSize);
+int getWindowSize(serverPtr server);
+int getListenSocket(serverPtr server);
+void recieve(serverPtr server);
 
-void serverConstructor(serverPtr serverPtr){
+void serverConstructor(serverPtr server){
 
     // Window Size
-    setWindowSize(serverPtr, 5);
+    setWindowSize(server, 5);
 
     // Port
-    serverPtr->port = "8000";
+    server->port = "8000";
 
     // Reset hints struct
-    memset(&(serverPtr->hints), sizeof serverPtr->hints, 0);
+    memset(&(server->hints), 0,sizeof server->hints);
     // Filling in the hints addrinfo
-    serverPtr->hints.ai_family = AF_INET; // IPv4
-    serverPtr->hints.ai_socktype = SOCK_DGRAM; //UDP Socket
-    serverPtr->hints.ai_flags =  AI_PASSIVE; // Fill in my IP for me
+    server->hints.ai_family = AF_UNSPEC; // IPv4 or 6
+    server->hints.ai_socktype = SOCK_DGRAM; //UDP Socket
+    server->hints.ai_flags =  AI_PASSIVE; // Fill in my IP for me
 
     int status;
 
-    if((status = getaddrinfo(NULL, (char*)serverPtr->port, &(serverPtr->hints), &(serverPtr->servinfo))) < 0){
-        perror("\033[91mServer GetAddrInfo():\033[0m");
+    if((status = getaddrinfo(NULL, (char*)server->port, &(server->hints), &(server->servinfo))) != 0){
+        fprintf(stderr, "\033[91mgetaddrinfo error: %s\n\033[0m", gai_strerror(status));
         exit(EXIT_FAILURE);
     }
 
     // Find correct node in servinfo linked list
-    for(struct addrinfo *ptr = serverPtr->servinfo; ptr != NULL; ptr = ptr->ai_next){
+    for(struct addrinfo *ptr = server->servinfo; ptr != NULL; ptr = ptr->ai_next){
         // Open a socket
-        if((serverPtr->listenSocket = socket(ptr->ai_family, ptr->ai_socktype, ptr->ai_protocol)) == -1){
-            perror("\033[91mServer UDP socket():\033[0m");
+        if((server->listenSocket = socket(ptr->ai_family, ptr->ai_socktype, ptr->ai_protocol)) == -1){
+            perror("\033[91mServer UDP socket():");
+            printf("\033[0m");
             // Look for next valid node
             continue;
         }
         // Bind to the socket
-        if(bind(serverPtr->listenSocket, ptr->ai_addr, ptr->ai_addrlen) < 0){
+        if(bind(server->listenSocket, ptr->ai_addr, ptr->ai_addrlen) < 0){
             // Close socket
-            close(serverPtr->listenSocket);
-            perror("\033[91mServer UDP bind():\033[0m");
+            close(server->listenSocket);
+            perror("\033[91mServer UDP bind():");
+            printf("\033[0m");
             // Look for next valid node
             continue;
         }
@@ -65,43 +67,49 @@ void serverConstructor(serverPtr serverPtr){
         break;
     }
     // Server ready to listen
-    printf("\033[92mServer listening at port %s...\n\033[0m", serverPtr->port);
+    printf("\033[92mServer listening at port %s...\n\033[0m", server->port);
+
+    // Recieve Datagrams
+    recieve(server);
 }
-void serverDestructor(serverPtr serverPtr){
+void serverDestructor(serverPtr server){
     // Free servinfo
-    freeaddrinfo(serverPtr->servinfo);
+    freeaddrinfo(server->servinfo);
 }
-void setWindowSize(serverPtr serverPtr, int windowSize){
-    serverPtr->windowSize = windowSize;
+void setWindowSize(serverPtr server, int windowSize){
+    server->windowSize = windowSize;
     return;
 }
-int getWindowSize(serverPtr serverPtr){
-    return serverPtr->windowSize;
+int getWindowSize(serverPtr server){
+    return server->windowSize;
 }
-int getListenSocket(serverPtr serverPtr){
-    return serverPtr->listenSocket;
+int getListenSocket(serverPtr server){
+    return server->listenSocket;
 }
-void recieve(serverPtr serverPtr){
+void recieve(serverPtr server){
     // Video File Parameters
     size_t bytesRecieved = 0;
     size_t fileSize = 0;
     size_t remainingBytes = 0;
 
     // Packets array
-    Packet packetArray[getWindowSize(serverPtr)];
+    Packet packetArray[getWindowSize(server)];
 
     // Recieve Request From Client
     socklen_t addrLen = sizeof (struct sockaddr);
     char fileName[MAX_BUFFER_SIZE];
     if((bytesRecieved = recvfrom(
-        getListenSocket(serverPtr),
+        getListenSocket(server),
         &fileName,
         sizeof fileName,
         0,
-        (struct sockaddr *)serverPtr->clientAddress,
+        (struct sockaddr *)server->clientAddress,
         &addrLen
         )) < 0){
-        perror("\033[91mServer recvFrom():\033[0m");
+        perror("\033[91mServer recvFrom():");
+        printf("\033[0m");
         exit(EXIT_FAILURE);
     }
+
+    // Print Client's address
 }

@@ -17,9 +17,9 @@ typedef struct Server {
 
 typedef Server* serverPtr;
 
-void serverConstructor(serverPtr serverPtr);
-void serverDestructor(serverPtr serverPtr);
-void setWindowSize(serverPtr serverPtr, int windowSize);
-int getWindowSize(serverPtr serverPtr);
-int getListenSocket(serverPtr serverPtr);
-void recieve(serverPtr serverPtr);
+void serverConstructor(serverPtr server);
+void serverDestructor(serverPtr server);
+void setWindowSize(serverPtr server, int windowSize);
+int getWindowSize(serverPtr server);
+int getListenSocket(serverPtr server);
+void recieve(serverPtr server);
