@@ -1,5 +1,6 @@
 {
     "files.associations": {
         "packet.h": "c"
-    }
+    },
+    "C_Cpp.default.compilerPath": ""
 }

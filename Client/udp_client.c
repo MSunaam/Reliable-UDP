@@ -14,7 +14,7 @@
 #include <time.h>
 #include <pthread.h>
 
-#define SERVER_PORT "4950" // the port users will be connecting to
+#define SERVER_PORT "8000" // the port users will be connecting to
 #define BUFFER_SIZE 500 // BUFFER_SIZE as per required for each segment (e.g: 512)
 
 
@@ -48,6 +48,9 @@ int no_of_acks;
 int temp_ack;
 int acks[5];
 int no_of_packets = 5;
+
+char* fileName = "IMG_9688.MOV";
+// size_t length = strlen(fileName);
 
 
 // thread to receive acks (runs in parallel with the main program)
@@ -120,12 +123,19 @@ int main(int argc, char* argv[]) {
 	time1.tv_sec = 0;
 	time1.tv_nsec = 300000000L;
 
-	FILE * in = fopen("input_video.mp4","rb"); // open the video file in read mode
+	FILE * in = fopen(fileName,"rb"); // open the video file in read mode
 	
 	// if the file is not readable
 	if (in == NULL) {
 		perror("Error in opening the video file.\n");
 		return 0;
+	}
+
+	//File name
+	FILENAME:
+	if(sendto(socket_fd, fileName, strlen(fileName), 0, ptr->ai_addr, ptr->ai_addrlen) < 0) {
+	// resend the file name
+		goto FILENAME;
 	}
 	
 	// size of the video file

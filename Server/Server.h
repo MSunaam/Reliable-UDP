@@ -4,7 +4,7 @@
 #include <sys/socket.h> 
 #include <netdb.h>
 
-typedef struct sockaddr* clientAddress;
+typedef struct sockaddr clientAddress;
 
 typedef struct Server {
     char* port;
@@ -14,12 +14,17 @@ typedef struct Server {
     int windowSize;
     clientAddress clientAddress;
 } Server;
-
 typedef Server* serverPtr;
+
+typedef struct ThreadParams {
+    serverPtr server;
+} ThreadParams;
+
 
 void serverConstructor(serverPtr server);
 void serverDestructor(serverPtr server);
 void setWindowSize(serverPtr server, int windowSize);
 int getWindowSize(serverPtr server);
 int getListenSocket(serverPtr server);
-void recieve(serverPtr server);
+void receiveFile(serverPtr server);
+void* receivePackets(void* params);
