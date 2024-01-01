@@ -3,53 +3,87 @@ This code is for .mp4 video files.
 The input video file should have name input_video.mp4
 The output file will be generated as output_video.mp4
 
-### TO RUN UDP_SERVER:
- - gcc udp_server.c -lpthread -o udp_serv
- - ./udp_serv
+## Description
 
-### TO RUN UDP_CLIENT:
- - gcc udp_client.c -lpthread -o udp_cli
- - ./udp_cli 127.0.0.1
+### Idea:
+This project presents the design and implementation of a reliable video file transfer system using User Datagram Protocol (UDP) and C sockets. The project aims to overcome network unreliability by incorporating essential mechanisms such as sequence numbers, retransmission, window size, and reordering on the receiver side. This report provides an overview of UDP protocol, explains the implementation of reliability using UDP, and discusses the structure and functionality of the developed client and server applications.
 
-## Behavior
+## UDP and TCP Overview
 
-### General:
-This project requires implementation of code for a sender and receivers that implements video file transfer over UDP protocol using Linux/GNU C sockets. Sender opens a video file, reads data chunks from the file, and writes UDP segments, it then sends these segments on UDP. Receiver is able to receive, reorder and write data to a file at the receiving end. Some further improvements are made to the traditional UDP flow for increased reliability.
-### Sender:
-The sender reads the file specified by the filename and transfers it using UDP sockets. The sender sends over packets of 500 bytes, and with retransmission for packets that might not have reached to the receiver end. Additionally the packets are sent in a window size of 5 UDP segments each of which have a wait time of 0.03 seconds waiting time in-between. On completing the transfer, the sender terminates and exits. The sender binds to the listen port to receive acknowledgments and other signaling from the receiver. A single UDP socket is used for both sending and receiving data.
-### Receiver:
-The receiver binds to the UDP port specified on the command line and receives a file from the sender sent over the port. The file is received in packets of 500 bytes each; furthermore each packet is serialized so that the file can be reordered exactly on the receiver side. The packets are received in window size of 5 UDP segments each with a delay of 0.03 seconds between them. The file is then saved to a different filename. The receiver exits once the transfer is complete.
+### TCP:
+TCP is a connection-oriented protocol that establishes a reliable, ordered, and error-checked connection between two applications. It provides features such as flow control, congestion control, and error recovery mechanisms using acknowledgments and retransmissions.
+### UDP:
+UDP is a lightweight transport layer protocol that operates on top of IP (Internet Protocol). It offers a simple, connectionless communication model without the overhead of establishing and maintaining a connection. UDP provides fast and efficient data transmission but does not guarantee reliability, ordering, or congestion control.
+## Implementing Reliability in UDP:
+To make UDP reliable, several mechanisms are implemented in the project:
 
-## Design
+### 	Sequence Numbers
+Sequence numbers are assigned to each packet to maintain the order of transmission. Both the sender and receiver keep track of the sequence numbers to ensure packets are processed in the correct order.
 
-### UDP Connection Unreliability:
-A User Datagram Protocol (UDP) connection between a client and a server provides high speed communication. As UDP is not a connection-oriented communications protocol, it does not ensure the availability of a connection between the client and server before transferring data. This allows fast transfer of data but also some packets i.e. bits of data, might get lost in transit. This in turns leads to a generally more unreliable connection as compared to another popular transport protocol, Transmission Control Protocol (TCP).
-### Implementing Reliability in UDP:
-For most of its use cases the unreliability of UDP is not a hindrance rather a design choice; as in streaming media, real-time multiplayer games and voice over IP (VoIP) loss of packets is not a fatal problem. But if we were to use a UDP connection for downloading content or sending over a video file then this loss of packets and disorderly transmission is unwanted. To overcome this hurdle we have implemented the following in our construction of this solution:
-1) Sequence numbers: All the packets being sent from the sender side are numbered this helps in maintaining order of packets intact.
-2) Retransmission: Packets for which the sender has received no acknowledgment for are selectively repeated. This ensures that no packets are lost while transmitting.
-3) Window size of 5 UDP segments: Stop and wait is incorporated with sending at most 5 packets at a time and then waiting for their acknowledgment of being received. This wait time allows for a retransmission period. 
-4) Reordering on receiver side: Using the sequence numbers from step 1 packets being received on the receiver end is recombined to form their initial form.
-All these steps make UDP much more reliable.
-### Sender:
-The sender is defined in the file udp_client.c. This file sends the video file as datagrams. The client starts by creating a UDP socket, and then continues to open the input video file in read mode and concurrently reads the size of the file. Then the client firstly sends over the file size over to the receiver. 
-After this the client goes into the main execution loop which runs until all the data has been successfully transferred over the receiver. In this loop firstly packets of 500 bytes are made from the remaining data, after this those 5 packets (equal to the window size) are sent over to the receiver. In the next step the client gets ready to receive acknowledgment from the receiver about successful packets transmission, for this reason the code waits (sleeps) for 0.03 seconds. The packets for which no acknowledgment is received after this wait interval are then selectively retransmitted. Again the client wait and makes certain that the resent packets are properly received on the other end if not the previous step reiterates until acknowledgment for all the sent packets is ascertained. This main loop ends here.
-Eventually when the UDP client is done transmitting the datagrams it closes down the socket and exits.
+### 	Retransmission (Selective Repeat)
+Selective Repeat is a retransmission technique used to handle lost or corrupted packets. The sender maintains a window of packets waiting for acknowledgment. 
 
-![Client](https://github.com/Fatima-Mujahid/reliability-with-udp/blob/main/Resources/Client.png)
-### Receiver:
-The receiver is defined in the file udp_server.c. This file receives the video file as datagrams.
-The server starts by creating a UDP socket and binds the socket to the servers address. The server opens a video file in write mode and proceeds to wait until it receives some datagrams from the sender. The first thing that the server receives is the file size of the video file being sent over.
-After this the server goes into the main execution loop which runs until all the data (5 packets each of 500 bytes) has been successfully received from the sender. Firstly the server sets itself up for receiving those five packets during this execution loop iteration. The server then continues onto receiving those packets and sending back acknowledgment for those packets that have been received in parallel. Now by predefining the window size the server knows exactly how many packets to expect and after a wait period of 0.03 seconds if it has not received the correct number of packets, it returns to receiving state once again in the same iteration of the execution loop. After the entirety of the packets and their contents have been received and acknowledged back to the sender the servers starts writing the packets to the output file. It is here that the sequential number of packets that was done by the sender comes to use as the server outputs to the write file accordingly resulting in no rearranging of data in the video file, which would render the video unwatchable. The main loop ends here.
-Eventually when the UDP server is done receiving the datagrams it closes down the socket and exits.
+### 	Window Size
+A sliding window mechanism is implemented with a window size of 5 UDP segments. This mechanism allows the sender to transmit multiple packets before waiting for acknowledgments, improving overall efficiency.
 
-![Server](https://github.com/Fatima-Mujahid/reliability-with-udp/blob/main/Resources/Server.png)
+### 	Reordering on the Receiver Side
+The receiver reorders the received packets based on their sequence numbers before writing them to a file. This ensures that the video file is reconstructed correctly.
+
+## Code Structure
+![Structure](https://github.com/MSunaam/Reliable-UDP/blob/main/Resources/structure.png)
+## Functionality and Implementation
+### Client:
+Following functionalities are implemented by client:
+* The sender reads the file specified by the filename provided.
+*	The sender divides the file data into packets of 500 bytes each.
+*	It sends the packets over the UDP connection to the receiver.
+*	If a packet fails to reach the receiver, the sender performs retransmission for that packet.
+*	The sender sends packets in a window size of 5 UDP segments.
+*	It waits for acknowledgments from the receiver before sending the next window of packets.
+*	The wait time in-between sending each packet is 0.03 seconds.
+*	The sender binds to a listen port to receive acknowledgments and other signaling from the receiver.
+*	It waits for acknowledgments from the receiver for each sent packet.
+*	The code creates a separate thread using the pthread_create function. 
+*	receiveAcks function is used as the start routine for the thread. 
+*	The receiveAcks function is responsible for receiving acknowledgments from the server for the sent packets. It runs in a separate thread, concurrently with the main thread that continues sending packets.
+*	The main purpose of this thread is to listen for acknowledgments and update the acknowledgment status in an array called ackArray.
+*	Within the receiveAcks function, a loop is used to continuously receive acknowledgments from the server until all packets have been acknowledged.
+*	The received acknowledgment contains the sequence number of the acknowledged packet. The thread updates the corresponding entry in the ackArray to indicate that the packet has been successfully received by the server.
+*	After successfully transferring the entire file, the sender completes the transfer.
+*	It terminates and exits the application
+
+### Server:
+Following functionalities are implemented by Server:
+
+*	Server creates a socket and binds it to the specified port to listen for incoming connections.
+*	The server enters a loop to receive the file from the client. Within the loop, it performs the following steps:
+*	It waits to receive the file name, file size, and the number of packets from the client.
+*	It creates a file with the received file name to write the received data.
+*	It initializes the packet array, acknowledgment array, number of received acknowledgments, current sequence number, and the total number of packets.
+*	The receiveFile function creates a new thread using pthread_create and passes the receivePackets function as the thread routine. 
+*	The receivePackets function is the entry point for the receive packets thread. It receives packets and updates the packetArray and ackArray data structures.
+*	Each thread receives packets until the specified number of packets is received or a duplicate packet is received.
+*	Upon receiving a packet, it updates the packet array and acknowledgment array accordingly.
+*	It sends an acknowledgment for each received packet.
+*	Once all packets are received, it writes the received data to the file.
+*	Inside the receiveFile function, after creating the receive packets thread, there is a delay using nanosleep to allow time for packets to start arriving before sending acknowledgments.
+*	The main thread then waits for the receive packets thread to complete using pthread_join. This ensures that all packets have been received before processing them.
+*	After successfully receiving and writing the entire file, the server completes the file transfer.
+
+
+## Design:
+### Client:
+![Client](https://github.com/MSunaam/Reliable-UDP/blob/main/Design/Client.png)
+### Server:
+![Server](https://github.com/MSunaam/Reliable-UDP/blob/main/Design/Server.png)
 
 ## Output
 
 ### Client:
-![Client Output 1](https://github.com/Fatima-Mujahid/reliability-with-udp/blob/main/Resources/client1.png)
-![Client Output 2](https://github.com/Fatima-Mujahid/reliability-with-udp/blob/main/Resources/client2.png)
+![Client Output 1](https://github.com/MSunaam/Reliable-UDP/blob/main/Resources/client1.png)
+
+![Client Output 2](https://github.com/MSunaam/Reliable-UDP/blob/main/Resources/client2.png)
 ### Server:
-![Server Output 1](https://github.com/Fatima-Mujahid/reliability-with-udp/blob/main/Resources/server1.png)
-![Server Output 2](https://github.com/Fatima-Mujahid/reliability-with-udp/blob/main/Resources/server2.png)
+![Server Output 1](https://github.com/MSunaam/Reliable-UDP/blob/main/Resources/server1.png)
+
+![Server Output 2](https://github.com/MSunaam/Reliable-UDP/blob/main/Resources/server2.png)
