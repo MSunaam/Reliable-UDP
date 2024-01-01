@@ -1,6 +1,6 @@
 #include "Client.h"
 #include "../Packet/packet.h"
-
+//necessary header files required for network communication, file operations, threading, and other functionalities.
 #include <stdio.h>
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -39,12 +39,17 @@ int ackNumber = 0;
 int ackArray[WINDOW_SIZE];
 Packet packetArray[WINDOW_SIZE]; 
 
+//function prototypes for the functions used in the code.
 void clientConstructor(clientPtr client);
 void clientDestructor(clientPtr client);
 void sendFile(clientPtr client);
 int getConnectionSocket(clientPtr client);
 void* receiveAcks(void* params);
 
+//ClientConstructor uses the getaddrinfo function to get the server's address information based on the provided IP address and port number. 
+//It then iterates over the linked list of address structures returned by getaddrinfo 
+//and opens a socket using the appropriate address family, socket type, and protocol. 
+//If a valid node is found, it sets the server address and breaks out of the loop
 void clientConstructor(clientPtr client){
     //Server Port
     client->port = "8000";
@@ -82,13 +87,13 @@ void clientConstructor(clientPtr client){
     sendFile(client);
 }
 void clientDestructor(clientPtr client){
-    // Free servinfo
+    // It frees the memory allocated for the servinfo structure using the freeaddrinfo function.
     freeaddrinfo(client->servinfo);
 }
 void sendFile(clientPtr client){
     pthread_t threadId;
 
-    // Time delays
+    // Time delays for nanosleep function
     struct timespec reqTime, remTime;
     reqTime.tv_sec = 0;
     reqTime.tv_nsec = 300000000L;
@@ -110,8 +115,9 @@ void sendFile(clientPtr client){
     // Get Size of File
     struct stat fileStat;
     int fileSize = fileno(file);
+	//The fstat function takes the "file descriptor fileSize obtained from the fileno function" and retrieves information about the file, including its size.
 	fstat(fileSize, &fileStat);
-	size_t file_size = fileStat.st_size;
+	size_t file_size = fileStat.st_size;// file_size : variable used to store the file size
 	printf("\033[92mSize of Video File: %d bytes\n\033[0m",(int) file_size);
 
 	// sending the size of the video file to the server
@@ -124,15 +130,16 @@ void sendFile(clientPtr client){
 	int data = 1;
     // While there is data
     while(data > 0){
-        //make packets
-        // make packets
+        // 1---------make packets-------------------------
 		int currentSequenceNumber = 0;
 		for (int i = 0; i < no_of_packets; i++) {
-            		// data
+            		// data = The return value of `fread` =  the number of bytes read.
 			data = fread(packetArray[i].packetData, 1, MAX_BUFFER_SIZE, file);
-            		// sequence number
+			//sequence number and packet size are set in the `packetArray` structure for each packet
+			
+            		// sequence number:
 			packetArray[i].packetSequenceNumber = currentSequenceNumber;
-          		// packet size
+          		// packet size:
 			packetArray[i].packetSize = data;
 			currentSequenceNumber++;
 
@@ -147,7 +154,7 @@ void sendFile(clientPtr client){
             		}
 		}
 
-		// SEND window size packets
+		// 2----------SEND window size packets to receiver-------------------
 		for (int i = 0; i < no_of_packets; i++) {
 			printf("Sending packet %d\n", packetArray[i].packetSequenceNumber);
 			if(sendto(getConnectionSocket(client), &packetArray[i], sizeof(Packet), 0, &client->serverAddress, addrLen) < 0) {
@@ -156,23 +163,27 @@ void sendFile(clientPtr client){
 			}            
 		}
 
-        	// RESET the array
+        	//3------------ RESET the array -->  to prepare for receiving acknowledgments from the server----------
         	for (int i = 0; i < no_of_packets; i++) { 
         		ackArray[i] = 0;
         	}
 
 		ackNumber = 0;
 
-		// Client starts receiving ACKS
+		//4------------- Client starts receiving ACKS--------------------------
         memset(&params,0,sizeof params);
         params.client = client;
+	    
+	    //new thread (ACKNOWLEDGEMENT THREAD) -> to receive acknowledgments
 		pthread_create(&threadId, NULL, receiveAcks, (void*)&(params));
                    
-		// Wait for acks to be received
+		//The nanosleep function -> used to introduce a delay of reqTime between sending packets and checking for acknowledgments.
 		nanosleep(&reqTime, &remTime);
 
 		
-		// send those packets ONLY whose acks have not been received
+		// Nested loop -> send those packets ONLY whose acks have not been received.
+	    	//1.The ackArray is checked, and if the acknowledgment for a particular packet has not been received (indicated by ackArray[i] == 0), 
+	    	//2.the packet is resent to the server using the sendto function.
 		RESEND:
 		for (int i = 0; i < no_of_packets; i++) {
 
@@ -196,18 +207,23 @@ void sendFile(clientPtr client){
 		}
 
 		// 5 acks have been received i.e. the thread executes successfully
+	    	//the thread is joined using pthread_join to synchronize the main thread with the acknowledgment thread.
 		pthread_join(threadId, NULL);
 
 		// repeat process until the eof is not reached 
     }
+   // message is printed to indicate that the file transfer has completed successfully
     printf("\n\033[92mFile transfer completed successfully!\n\033[0m");
 	
 	close(getConnectionSocket(client)); // close the socket
 	return;
 }
+//retrieves and returns the socket file descriptor associated with the client's connection.
 int getConnectionSocket(clientPtr client){
     return client->connectionSocket;
 }
+
+//THREAD FUNCTION ->  receives acknowledgments (acks) from the server.
 void* receiveAcks(void *params){
     ThreadParams *param = (ThreadParams*)params;
     clientPtr client = param->client;
@@ -218,19 +234,20 @@ void* receiveAcks(void *params){
     // receive 5 acks 
 	for (int i = 0; i < no_of_packets; i++) {
 
-    RECEIVE:
+    RECEIVE:	
+    		//It receives an acknowledgment (currentAck) from the connection socket and stores the number of bytes received in the bytesReceived variable
 		if((bytesReceived = recvfrom(getConnectionSocket(client), &currentAck, sizeof(currentAck), 0, (struct sockaddr*) &client->serverAddress, &addrLen)) < 0) {
 			perror("\033[91mUDP Client: recvfrom\033[0m");
 			exit(EXIT_FAILURE);
 		} 
 		
-		// in case of duplicate ack
+		// DUPLICATE ACK: 
 		if (ackArray[currentAck] == 1) {
 			// receive ack again until a unique ack is received
 			goto RECEIVE; 
 		}
 
-		// in case of unique ack
+		// UNIQUE ACK :  prints the acknowledgment value and updates the ackArray and ackNumber variables.
 		printf("Ack Received: %d\n", currentAck);
 		// reorder acks according to the packet's sequence number
 		// make the value 1 in the acks[] array, where array position is the value of ack received (i.e. the sequence number of the packet acknowledged by the server)
@@ -238,5 +255,6 @@ void* receiveAcks(void *params){
 		ackNumber++;
 
 	}
+	//thread function returns NULL to indicate the completion of its execution.
     return NULL;
 }
