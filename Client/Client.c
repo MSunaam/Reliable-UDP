@@ -22,21 +22,26 @@
 // Green success code => \033[92m
 // Blue Info code => \033[94m
 // Bold Code => \033[1m
-
+//
+// LOCALHOST is set to the IP address 127.0.0.1, representing the local machine. 
 #define LOCALHOST "127.0.0.1"
+// MAX_BUFFER_SIZE specifies the maximum size of the buffer for sending and receiving data. 
 #define MAX_BUFFER_SIZE 500
+// WINDOW_SIZE defines the size of the sliding window for sending packets. 
 #define WINDOW_SIZE 5
-
+// fileName stores the name of the file to be sent. 
 char* fileName = "IMG_9688.MOV";
+// addrLen is the length of the sockaddr structure. 
 socklen_t addrLen = sizeof (struct sockaddr);
-
+// ThreadParams is a structure used for passing parameters to a thread. 
 ThreadParams params;
-
+//no_of_packets represents the total number of packets to be sent in a single cycle. 
 int no_of_packets = 5;
+//  ackNumber keeps track of the number of acknowledgments received. 
 int ackNumber = 0;
-
-// ACK Array
+// ackArray is an array to keep track of received acknowledgments
 int ackArray[WINDOW_SIZE];
+//packetArray stores the packets to be sent.
 Packet packetArray[WINDOW_SIZE]; 
 
 //function prototypes for the functions used in the code.
