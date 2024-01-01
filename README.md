@@ -1,9 +1,5 @@
 # Reliable Video File Transfer with UDP
-This code is for .mp4 video files.
-The input video file should have name input_video.mp4
-The output file will be generated as output_video.mp4
 
-## Description
 
 ### Idea:
 This project presents the design and implementation of a reliable video file transfer system using User Datagram Protocol (UDP) and C sockets. The project aims to overcome network unreliability by incorporating essential mechanisms such as sequence numbers, retransmission, window size, and reordering on the receiver side. This report provides an overview of UDP protocol, explains the implementation of reliability using UDP, and discusses the structure and functionality of the developed client and server applications.
